@@ -1,50 +1,37 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from './entities/user.entity';
+import { ClientGrpc } from '@nestjs/microservices';
 
 @Injectable()
 export class UserService {
 
-  constructor(
-    @InjectRepository(User)
-    private usersRepository: Repository<User>,
-  ) {}
+  private static readonly newProperty = 'USER_PACKAGE';
 
-  create(createUserDto: CreateUserDto) {
-    const user = new User();
-    user.name = createUserDto.name;
-    user.email = createUserDto.email;
-    user.password = createUserDto.password;
+  constructor(@Inject(UserService.newProperty) private client: ClientGrpc) {}
+  private userService;
 
-    return this.usersRepository.save(user)
+  onModuleInit() {
+    this.userService = this.client.getService('UserService');
   }
 
-  findAll() {
-    return this.usersRepository.find({ where: { deletedAt: null }});
+  createUser(createUserDto: CreateUserDto) {
+    return this.userService.createUser(createUserDto);
   }
 
-  findOne(id: number) {
-    const userFound = this.usersRepository.findOne({ where: { id,deletedAt: null }} );
-    if (!userFound) throw new NotFoundException('Este usuario no existe');
-
-    return userFound;
+  getAllUsers() {
+    return this.userService.getAllUsers({});
   }
 
-  async update(id: number, updateUserDto: UpdateUserDto) {
-    const userFound = await this.usersRepository.findOne({ where: { id,deletedAt: null }} );
-    if (!userFound) throw new NotFoundException('Este usuario no existe');
-    const updatedUser = Object.assign(userFound, updateUserDto);
-
-    return this.usersRepository.save(updatedUser);
+  getUser(id: number) {
+    return this.userService.getUser({ id });
   }
 
-  async remove(id: number) {
-    const user = await this.usersRepository.findOne({ where: { id,deletedAt: null }} );
-    if (!user) throw new NotFoundException('Este usuario no existe');
-    await this.usersRepository.update(id,{ deletedAt: new Date()});
-    return "Usuario eliminado correctamente"
+  updateUser(id: number, updateUserDto: UpdateUserDto) {
+    return this.userService.updateUser({ id, user: updateUserDto });
+  }
+
+  deleteUser(id: number) {
+    return this.userService.deleteUser({ id });
   }
 }
